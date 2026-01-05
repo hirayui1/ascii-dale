@@ -200,23 +200,75 @@ def change_map(player, old_map, map_type):
         os.system("cls")
         print_map(old_map)
 
+### Trying to make pynput work, starting from importing
+from pynput import keyboard
+from pynput.keyboard import Key
+import os
+import time
+
+last_key = None
+running = True
 
 def game_loop(player, map):
+    global last_key, running
+
     os.system("cls")
     print_map(map)
-    while True:
-        if msvcrt.kbhit():
-            key = msvcrt.getch().decode()
+
+    def on_press(key):
+        global last_key
+        try:
+            last_key = key.char
+        except AttributeError:
+            last_key = key
+
+    def on_release(key):
+        global running
+        if key == keyboard.Key.esc:
+            running = False
+            return False
+
+    listener=keyboard.Listener(
+            on_press=on_press,
+            on_release=on_release)
+    listener.start()
+
+    while running:
+        if last_key is not None:
+            key = last_key
+            last_key = None
+
             if key == '0':
                 os.system("cls")
                 break
+
             move(player, key, map)
+            
             if player.old_char == 'E': # we put this after move() because thats when old_char gets updated
                 os.system("cls")
                 break
             change_map(player, map, player.old_char)
             random_fight(player, map)
         time.sleep(0.02)
+    
+    listener.stop()
+
+# def game_loop(player, map):
+#     os.system("cls")
+#     print_map(map)
+#     while True:
+#         if msvcrt.kbhit():
+#             key = msvcrt.getch().decode()
+#             if key == '0':
+#                 os.system("cls")
+#                 break
+#             move(player, key, map)
+#             if player.old_char == 'E': # we put this after move() because thats when old_char gets updated
+#                 os.system("cls")
+#                 break
+#             change_map(player, map, player.old_char)
+#             random_fight(player, map)
+#         time.sleep(0.02)
 
 def find_start(map):
     for i in range(len(map)):
