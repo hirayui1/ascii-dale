@@ -1,3 +1,12 @@
+# Classes
+
+class Player:
+    def __init__(self, x, y, clazz):
+        self.x = x
+        self.y = y
+        self.clazz = clazz
+        self.old_char = '.'
+
 class Warrior:
     def __init__(self, name, hp=10, dmg=5):
         self.name = name
@@ -9,24 +18,19 @@ class Warrior:
             self.dmg = dmg
         else:
             dmg = 5
-        #print(f"Warrior {name} with {hp} health points and {dmg} damage has been successfully created.")
-
-    def print_woriur(self):
-        print("You have encoutered a mighty warrior!")
-        print(" O ")
-        print("/|\\")
-        print("/ \\")              
 
     def bonk(self, target):
-        target.take_damage(self.dmg)
+        return target.take_damage(self.dmg)
 
     def take_damage(self, dmg):
         if (self.hp > 0):
             self.hp = self.hp - dmg
             if self.hp <= 0:
                 print(f"{self.name:<3} took {dmg} dmg and died.")
+                return True # true if this dmg kills
             else:
                 print(f"{self.name:<5} lost {dmg} hp. Current hp: {self.hp}")
+                return False # false if still alive
         else:
             print(f"Your target is already dead, stop beating {self.name}'s corpse, you monstul!")
 
@@ -50,7 +54,7 @@ class Archer:
 
     def bonk(self, target):
         print(f"Bonking {target.name} for {self.m_dmg} dmg.")
-        target.take_damage(self.m_dmg)
+        return target.take_damage(self.m_dmg) # return true if target dies as a result
 
     def take_damage(self, dmg):
         if (self.hp > 0):
@@ -58,25 +62,63 @@ class Archer:
             print(f"{self.name} has taken {dmg} damage.")
             if self.hp <= 0:
                 print(f"{self.name} has died.")
+                return True # true if died as a result of taking damage
+            return False # false if still alive after taking damage
         else:
             print(f"Your target is already dead, stop beating {self.name}'s corpse, you monstul!")
+
+## ENEMY
+
+class Bat(Warrior):
+    def __init__(self, hp=6, dmg=2, name="Bat"):
+        self.hp = hp
+        self.dmg = dmg
+        self.name = name
+
+        print("You have found a bat!")
+        print("\\/O\\/")
+
+class Slime(Warrior):
+    def __init__(self, hp=3, dmg=3, name="Slime"):
+        self.hp = hp
+        self.dmg = dmg
+        self.name = name
+
+        print("It's a wobbly slime!")
+        print (" ___")
+        print ("(___)")
+
+class Sponder(Warrior):
+    def __init__(self, hp=4, dmg=6, name="Sponder"):
+        self.hp = hp
+        self.dmg = dmg
+        self.name = name
+
+        print("You see a crawling sponder. Kill it before it lays eggs!")
+        print("/\\o/\\")
+
+class Golem(Warrior):
+    def __init__(self, hp=25, dmg=7, name="Golem"):
+        self.hp = hp
+        self.dmg = dmg
+        self.name = name
+
+        print("You've encounter the boss of this area. May fortune favor you!")
+        print("  O ")
+        print("-/ \\-")
+        print(" |_|")
+        print("/   \\")
 
 def fight_to_death(target1, target2):
     print(f"Commencing a fight to death between {target1.name} and {target2.name}.\n")
     time.sleep(1)
-    while target1.hp > 0 and target2.hp > 0:
-        target1.bonk(target2)
+    while True:
+        if target1.bonk(target2):
+            break
         time.sleep(1)
-        target2.bonk(target1)
+        if target2.bonk(target1):
+            break
         time.sleep(1)
-
-
-class Player:
-    def __init__(self, x, y, clazz):
-        self.x = x
-        self.y = y
-        self.clazz = clazz
-        self.old_char = '.'
 
 #TODO: remove these    
 from colorama import Fore, Back, Style, init
@@ -112,17 +154,36 @@ def move(player, key, map):
 
     map[old_x][old_y] = player.old_char # change map 
     print(f"\033[{old_x+1};{old_y+1}H{COLORS.get(player.old_char, '')}{player.old_char}", RESET, end="")  # reprint old spot
-    sys.stdout.flush() 
     player.old_char = map[player.x][player.y] # update/hold current spot's char
     map[player.x][player.y] = '@' # put player to current spot
+    sys.stdout.flush() # flush above print near player movement
     print(f"\033[{player.x+1};{player.y+1}H{COLORS.get('@', '')}@", RESET, end="") # print player to current spot
     sys.stdout.flush() 
 
+def monster_random():
+    BAT_PROB = 0.4
+    SLIME_PROB = 0.2
+    SPONDER_PROB = 0.3 
+
+    if random.random() < BAT_PROB:
+        return Bat()
+    elif random.random() < SPONDER_PROB:
+        return Sponder()
+    elif random.random() < SLIME_PROB:
+        return Slime()
+    else:
+        return Golem()
+    
+# TODO: make these enemies appear only in the caves
+
 def random_fight(player, map):
-    if random.random() < 0.005:
+    if random.random() < 0.02:
         os.system("cls")
-        fight_to_death(player.clazz, Warrior("enemy"))
+        fight_to_death(player.clazz, monster_random())
         time.sleep(3)
+        if player.clazz.hp < 1:
+            print("Game Over.")
+            sys.exit()
         os.system("cls")
         print_map(map)
 
@@ -154,7 +215,7 @@ def game_loop(player, map):
                 os.system("cls")
                 break
             change_map(player, map, player.old_char)
-            #random_fight(player, map)
+            random_fight(player, map)
         time.sleep(0.02)
 
 def find_start(map):
@@ -164,24 +225,15 @@ def find_start(map):
                 return i, j
     return len(map) / 2, len(map[0]) / 2 # start at the middle of the map if player not found
 
-import msvcrt # TODO: graduate from this, it breaks cross-platform capability (its windows specific)
+import msvcrt # TODO: graduate from this, only works on win (tried blessed, it sucks)
 import time, os, sys, random
 from map_generator import * # default customizable map_generator
 from colorama import just_fix_windows_console
-from blessed import Terminal
 
 # TODO: change cursor repaint logic so that it doesn't break if screen is not big enough
+# probably curses-python
+
 def main():
-#     term = Terminal()
-#     with term.cbreak(), open("assets/overworld.map") as f: # runs while True in the context of blessed.Terminal
-#         map = [list(line) for line in f.read().split('\n')]
-#         x, y = find_start(map)
-#         player = Player(x, y, Warrior("Potat the Lost", 35))
-#         game_loop(player, map, term)
-#         while True:
-#             key = term.inkey(timeout=0.2)
-#             if key == 'w':
-#                 print("Move up!")
     just_fix_windows_console()
     init()
     print("\033[?25l", end="") # hides the cursor
@@ -195,19 +247,13 @@ def main():
     finally:
         print("\033[?25h", end="")
 main()
+
 ###CAVE PART - this is cool
 
 #MONSTERS
 
-class Bat:
-    def __init__(self, hp=6, att=2, name="Bat"):
-
-        self.hp = hp
-        self.att = att
-        self.name = name
-    print("You have found a bat!")
-    print("\\/O\\/")
-
 #TODO: a box with encounter appears on the right side of the map without closing it? @ frozen while it open
-#TODO: log showing what has happened - you entered a cave, you met an enemalso on the side. SEE, I DIDN'T FORGET
-#TODO: maybe add small pics showing enemy during encounter - bat = \/O\/
+#TODO: log showing what has happened - you entered a cave, you met an enemy - on the side. SEE, I DIDN'T FORGET
+#TODO: maybe add small pics showing enemy during encounter - bat = \/O\/ - maybe sponder = /\o/\
+#TODO: a randomizer that will choose an enemy for encounter
+#TODO: break terminal into small compartments using curses, and implement inventory into one of them.
