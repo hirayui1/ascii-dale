@@ -103,7 +103,7 @@ class Golem(Warrior):
         self.dmg = dmg
         self.name = name
 
-        print("You've encounter the boss of this area. May fortune favor you!")
+        print("You've encounter the boss of this area. May the fortune favor you!")
         print("  O ")
         print("-/ \\-")
         print(" |_|")
