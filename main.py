@@ -178,13 +178,13 @@ def monster_random():
 
 def random_fight(player, map):
     if random.random() < 0.02:
-        os.system("clear")
+        os.system("clear" if os.name == "nt" else "cls")
         fight_to_death(player.clazz, monster_random())
         time.sleep(3)
         if player.clazz.hp < 1:
             print("Game Over.")
             sys.exit()
-        os.system("clear")
+        os.system("clear" if os.name == "nt" else "cls")
         print_map(map)
 
 def change_map(player, old_map, map_type):
@@ -197,7 +197,7 @@ def change_map(player, old_map, map_type):
         game_loop(player, map) # TODO: make a way that if you gain something inside, player outside also does
         player.old_char = 'c'
         player.x, player.y = old_x, old_y
-        os.system("clear")
+        os.system("clear" if os.name == "nt" else "cls")
         print_map(old_map)
 
 ### Trying to make pynput work, starting from importing
@@ -212,7 +212,7 @@ running = True
 def game_loop(player, map):
     global last_key, running
 
-    os.system("clear")
+    os.system("clear" if os.name == "nt" else "cls")
     print_map(map)
 
     def on_press(key):
@@ -239,13 +239,13 @@ def game_loop(player, map):
             last_key = None
 
             if key == '0':
-                os.system("clear")
+                os.system("clear" if os.name == "nt" else "cls")
                 break
 
             move(player, key, map)
             
             if player.old_char == 'E': # we put this after move() because thats when old_char gets updated
-                os.system("clear")
+                os.system("clear" if os.name == "nt" else "cls")
                 break
             change_map(player, map, player.old_char)
             random_fight(player, map)
