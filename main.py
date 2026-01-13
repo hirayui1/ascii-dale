@@ -264,8 +264,12 @@ import time, os, sys, random, platform
 from map_generator import * # default customizable map_generator
 from colorama import just_fix_windows_console
 
-def clear_screen(): 
-    """Clear screen compatible with both Windows and macOS/Linux"""
+def clear_screen():
+    print("\033[H", end="")      # go home
+    print("\033[J", end="")      # clear from cursor down
+    sys.stdout.flush()
+
+
     # os.system('cls' if platform.system() == 'Windows' else 'clear') TODO: this breaks mac VSCode, upper column becomes invisible.
 
 # TODO: change cursor repaint logic so that it doesn't break if screen is not big enough
