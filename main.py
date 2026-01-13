@@ -1,5 +1,6 @@
 # Classes
-
+import curses
+from typing import Any
 class Player:
     def __init__(self, x, y, clazz):
         self.x = x
@@ -19,20 +20,36 @@ class Warrior:
         else:
             dmg = 5
 
-    def bonk(self, target):
-        return target.take_damage(self.dmg)
+    def display(self, stdscr, base_row: int = 0, base_col: int = 0) -> int:
+        """Display enemy message and ASCII art starting at base_row/base_col.
+        Returns the last row index that was written to."""
+        import curses
+        # Message on the first line
+        stdscr.addstr(base_row, base_col, getattr(self, 'message', ''), curses.color_pair(COLOR_DEFAULT))
+        row = base_row + 1
+        # Art may be multi-line; draw each line on its own row
+        art_lines = getattr(self, 'art', '').split('\n') if hasattr(self, 'art') else []
+        for line in art_lines:
+            stdscr.addstr(row, base_col, line, curses.color_pair(COLOR_DEFAULT))
+            row += 1
+        stdscr.refresh()
+        return row - 1
 
-    def take_damage(self, dmg):
-        if (self.hp > 0):
-            self.hp = self.hp - dmg
-            if self.hp <= 0:
-                print(f"{self.name:<3} took {dmg} dmg and died.")
-                return True # true if this dmg kills
-            else:
-                print(f"{self.name:<5} lost {dmg} hp. Current hp: {self.hp}")
-                return False # false if still alive
+    def bonk(self, target, stdscr, x):
+        return target.take_damage(self.dmg, stdscr, x) # return true if target dies as a result
+
+    def take_damage(self, dmg, stdscr, x):
+        import curses
+        if self.hp <= 0:
+            stdscr.addstr(x, 0, f"Your target is already dead, stop beating {self.name}'s corpse, you monstul!", curses.color_pair(COLOR_DEFAULT))
+            return False
+        self.hp -= dmg
+        if self.hp <= 0:
+            stdscr.addstr(x, 0, f"{self.name:<3} took {dmg} dmg and died.", curses.color_pair(COLOR_DEFAULT))
+            return True # true if this dmg kills
         else:
-            print(f"Your target is already dead, stop beating {self.name}'s corpse, you monstul!")
+            stdscr.addstr(x, 0, f"{self.name:<3} took {dmg} dmg, {self.hp} hp left.", curses.color_pair(COLOR_DEFAULT))
+            return False # false if still alive
 
 class Archer:
     def __init__(self, name, hp=8, m_dmg=10, r_dmg=6, range_treshold=2):
@@ -75,8 +92,8 @@ class Bat(Warrior):
         self.dmg = dmg
         self.name = name
 
-        print("You have found a bat!")
-        print("\\/O\\/")
+        self.message = "A wild bat appears!"
+        self.art = "  \\/O\\/ "
 
 class Slime(Warrior):
     def __init__(self, hp=3, dmg=3, name="Slime"):
@@ -84,9 +101,9 @@ class Slime(Warrior):
         self.dmg = dmg
         self.name = name
 
-        print("It's a wobbly slime!")
-        print (" ___")
-        print ("(___)")
+        # TODO: message and art
+        self.message = "It's a wobbly slime!"
+        self.art = " ___\n(___)"
 
 class Sponder(Warrior):
     def __init__(self, hp=4, dmg=6, name="Sponder"):
@@ -94,8 +111,8 @@ class Sponder(Warrior):
         self.dmg = dmg
         self.name = name
 
-        print("You see a crawling sponder. Kill it before it lays eggs!")
-        print("/\\o/\\")
+        self.message = "You see a crawling sponder. Kill it before it lays eggs!"
+        self.art = "/\\o/\\"
 
 class Golem(Warrior):
     def __init__(self, hp=25, dmg=7, name="Golem"):
@@ -103,67 +120,129 @@ class Golem(Warrior):
         self.dmg = dmg
         self.name = name
 
-        print("You've encounter the boss of this area. May fortune favor you!")
-        print("  O ")
-        print("-/ \\-")
-        print(" |_|")
-        print("/   \\")
+        self.message = "You've encounter the boss of this area. May fortune favor you!"
+        self.art = "  O \n-/ \\-\n |_|\n/   \\"
 
-def fight_to_death(target1, target2):
-    print(f"Commencing a fight to death between {target1.name} and {target2.name}.\n")
+from map_generator import * # default customizable map_generator
+
+def fight_to_death(target1, target2, stdscr):
+    # Display enemy art and message and get the last row used
+    last_row = target2.display(stdscr, base_row=0)
+    # Start combat messages after the art
+    start_row = last_row + 1
+    stdscr.addstr(start_row, 0, f"Commencing a fight to death between {target1.name} and {target2.name}.", curses.color_pair(COLOR_DEFAULT))
+    stdscr.refresh()
     time.sleep(1)
+    x = start_row + 1
     while True:
-        if target1.bonk(target2):
+        if target1.bonk(target2, stdscr, x):
+            stdscr.refresh()
             break
+        stdscr.refresh()
+        x += 1
         time.sleep(1)
-        if target2.bonk(target1):
+        if target2.bonk(target1, stdscr, x):
+            stdscr.refresh()
             break
+        stdscr.refresh()
+        x += 1
         time.sleep(1)
 
-#TODO: remove these    
-from colorama import Fore, Back, Style, init
+# Color pairs for curses
+COLOR_PLAYER = 1
+COLOR_TREASURE = 2
+COLOR_MOUNTAIN = 3
+COLOR_WALL = 4
+COLOR_DEFAULT = 5
 
-COLORS = {
-    '@': Style.BRIGHT + Fore.GREEN,   # green player
-    'T': Fore.YELLOW,   # yelo tresha
-    'M': Style.DIM + Fore.YELLOW,   # yelo tresha
-    'W': Style.BRIGHT + Fore.LIGHTBLACK_EX,   # yelo tresha
-}
+def init_colors():
+    """Initialize curses color pairs"""
+    curses.init_pair(COLOR_PLAYER, curses.COLOR_GREEN, curses.COLOR_BLACK)
+    curses.init_pair(COLOR_TREASURE, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+    curses.init_pair(COLOR_MOUNTAIN, curses.COLOR_YELLOW, curses.COLOR_BLACK)
+    curses.init_pair(COLOR_WALL, curses.COLOR_WHITE, curses.COLOR_BLACK)
+    curses.init_pair(COLOR_DEFAULT, curses.COLOR_WHITE, curses.COLOR_BLACK)
 
-RESET = '\033[0m'
+def print_map(stdscr, map, player):
+    """Draw the map on the screen using curses"""
+    stdscr.clear()
+    for row_idx, line in enumerate(map):
+        for col_idx, char in enumerate(line):
+            if row_idx < stdscr.getmaxyx()[0] and col_idx < stdscr.getmaxyx()[1]:
+                color_pair = COLOR_DEFAULT
+                if char == '@':
+                    color_pair = COLOR_PLAYER
+                elif char == 'T':
+                    color_pair = COLOR_TREASURE
+                elif char == 'M':
+                    color_pair = COLOR_MOUNTAIN
+                elif char == 'W':
+                    color_pair = COLOR_WALL
+                
+                try:
+                    stdscr.addch(row_idx, col_idx, ord(char), curses.color_pair(color_pair))
+                except curses.error:
+                    pass  # Ignore errors when writing outside screen bounds
+    stdscr.refresh()
 
-def print_map(map):
-    for line in map:
-        for char in line:
-            print(COLORS.get(char, ''), char, RESET, sep='', end='')
-            # print(char, end="")
-        print()
+def update_player_position(stdscr, player, old_x, old_y, map):
+    """Update only the previous and current player cells to avoid full-screen redraws."""
+    import curses
+    maxy, maxx = stdscr.getmaxyx()
 
-def move(player, key, map):
+    # Draw the character that should be at the old position
+    try:
+        if 0 <= old_x < maxy and 0 <= old_y < maxx:
+            ch = map[old_x][old_y]
+            color_pair = COLOR_DEFAULT
+            if ch == '@':
+                color_pair = COLOR_PLAYER
+            elif ch == 'T':
+                color_pair = COLOR_TREASURE
+            elif ch == 'M':
+                color_pair = COLOR_MOUNTAIN
+            elif ch == 'W':
+                color_pair = COLOR_WALL
+            stdscr.addch(old_x, old_y, ord(ch), curses.color_pair(color_pair))
+    except curses.error:
+        pass
+
+    # Draw the player at the new position
+    try:
+        if 0 <= player.x < maxy and 0 <= player.y < maxx:
+            stdscr.addch(player.x, player.y, ord('@'), curses.color_pair(COLOR_PLAYER))
+    except curses.error:
+        pass
+
+    stdscr.refresh()
+
+def move(stdscr, player, key, map):
+    """Handle player movement with collision detection"""
     old_x, old_y = player.x, player.y
+    
     if key == 'w' and player.x > 0 and map[player.x - 1][player.y] != 'M' and map[player.x - 1][player.y] != 'W':
-        player.x -= 1 # update player position
+        player.x -= 1
     elif key == 'a' and player.y > 0 and map[player.x][player.y - 2] != 'M' and map[player.x][player.y - 2] != 'W':
         player.y -= 2
-    elif key == 's' and player.x < len(map) - 1 and map[player.x + 1][player.y] != 'M' and map[player.x + 1][player.y] != 'W': # len - 1
+    elif key == 's' and player.x < len(map) - 1 and map[player.x + 1][player.y] != 'M' and map[player.x + 1][player.y] != 'W':
         player.x += 1
-    elif key == 'd' and player.y < len(map[player.x]) - 2 and map[player.x][player.y + 2] !='M' and map[player.x][player.y + 2] != 'W': # len - 2 because the end of the line is ". . . ." and we only care about every second dot
+    elif key == 'd' and player.y < len(map[player.x]) - 2 and map[player.x][player.y + 2] != 'M' and map[player.x][player.y + 2] != 'W':
         player.y += 2
     else:
         return
-
-    map[old_x][old_y] = player.old_char # change map 
-    print(f"\033[{old_x+1};{old_y+1}H{COLORS.get(player.old_char, '')}{player.old_char}", RESET, end="")  # reprint old spot
-    player.old_char = map[player.x][player.y] # update/hold current spot's char
-    map[player.x][player.y] = '@' # put player to current spot
-    sys.stdout.flush() # flush above print near player movement
-    print(f"\033[{player.x+1};{player.y+1}H{COLORS.get('@', '')}@", RESET, end="") # print player to current spot
-    sys.stdout.flush() 
+    
+    # Update map state
+    map[old_x][old_y] = player.old_char
+    player.old_char = map[player.x][player.y]
+    map[player.x][player.y] = '@'
+    
+    # Update only the changed cells to reduce flicker
+    update_player_position(stdscr, player, old_x, old_y, map) 
 
 def monster_random():
     BAT_PROB = 0.4
     SLIME_PROB = 0.2
-    SPONDER_PROB = 0.3 
+    SPONDER_PROB = 0.3
 
     if random.random() < BAT_PROB:
         return Bat()
@@ -176,82 +255,70 @@ def monster_random():
     
 # TODO: make these enemies appear only in the caves
 
-def random_fight(player, map):
-    if random.random() < 0.02:
-        clear_screen()
-        fight_to_death(player.clazz, monster_random())
+def random_fight(stdscr, player, map):
+    """Handle random encounters during movement"""
+    if random.random() < 0.005:
+        stdscr.clear()
+        stdscr.refresh()
+        fight_to_death(player.clazz, monster_random(), stdscr)
         time.sleep(3)
         if player.clazz.hp < 1:
-            print("Game Over.")
-            sys.exit()
-        clear_screen()
-        print_map(map)
+            stdscr.clear()
+            stdscr.addstr(0, 0, "Game Over.")
+            stdscr.refresh()
+            time.sleep(2)
+            return False
+        print_map(stdscr, map, player)
+    return True
 
-def change_map(player, old_map, map_type):
+def change_map(stdscr, player, map, map_type):
+    """Handle map transitions (e.g., entering caves)"""
     if map_type == 'C':
-        map = gen_cave(16, 16)
+        new_map = gen_cave(16, 16)
         old_x, old_y = player.x, player.y
         player.x, player.y = 0, 0
         older_char = player.old_char
         player.old_char = 'E'
-        game_loop(player, map) # TODO: make a way that if you gain something inside, player outside also does
+        game_loop(stdscr, player, new_map)
         player.old_char = 'c'
         player.x, player.y = old_x, old_y
-        clear_screen()
-        print_map(old_map)
+        print_map(stdscr, map, player)
 
 ### Trying to make pynput work, starting from importing
-from pynput import keyboard
-from pynput.keyboard import Key
 import os
 import time
 
-last_key = None
-running = True
-
-def game_loop(player, map):
-    global last_key, running
-
-    clear_screen()
-    print_map(map)
-
-    def on_press(key):
-        global last_key
-        try:
-            last_key = key.char
-        except AttributeError:
-            last_key = key
-
-    def on_release(key):
-        global running
-        if key == keyboard.Key.esc:
-            running = False
-            return False
-
-    listener=keyboard.Listener(
-            on_press=on_press,
-            on_release=on_release)
-    listener.start()
-
-    while running:
-        if last_key is not None:
-            key = last_key
-            last_key = None
-
-            if key == '0':
-                clear_screen()
-                break
-
-            move(player, key, map)
-            
-            if player.old_char == 'E': # we put this after move() because thats when old_char gets updated
-                clear_screen()
-                break
-            change_map(player, map, player.old_char)
-            random_fight(player, map)
-        time.sleep(0.02)
+def game_loop(stdscr, player, map):
+    """Main game loop using curses for input and rendering"""
+    # Configure curses
+    curses.curs_set(0)  # Hide cursor
+    stdscr.nodelay(True)  # Non-blocking input
+    stdscr.timeout(20)  # 20ms timeout for input
     
-    listener.stop()
+    init_colors()
+    print_map(stdscr, map, player)
+    
+    running = True
+    while running:
+        try:
+            key = stdscr.getch()
+            if key != curses.ERR:  # If a key was pressed
+                if key == ord('q') or key == ord('0'):  # Quit on 'q' or '0'
+                    running = False
+                elif key in [ord('w'), ord('a'), ord('s'), ord('d')]:  # Movement keys
+                    move(stdscr, player, chr(key), map)
+                    if player.old_char == 'E':  # Exit cave
+                        running = False
+                    else:
+                        change_map(stdscr, player, map, player.old_char)
+                        if not random_fight(stdscr, player, map):
+                            running = False
+                elif key == ord('0'):
+                    running = False
+        except KeyboardInterrupt:
+            running = False
+    
+    curses.curs_set(1)  # Show cursor again
 
 def find_start(map):
     for i in range(len(map)):
@@ -260,37 +327,30 @@ def find_start(map):
                 return i, j
     return len(map) / 2, len(map[0]) / 2 # start at the middle of the map if player not found
 
-import time, os, sys, random, platform
-from map_generator import * # default customizable map_generator
+import time, os, sys, random, platform, curses
 from colorama import just_fix_windows_console
-
-def clear_screen():
-    print("\033[H", end="")      # go home
-    print("\033[J", end="")      # clear from cursor down
-    sys.stdout.flush()
-
-
-    # os.system('cls' if platform.system() == 'Windows' else 'clear') TODO: this breaks mac VSCode, upper column becomes invisible.
 
 # TODO: change cursor repaint logic so that it doesn't break if screen is not big enough
 # probably curses-python
 
-def main():
-    just_fix_windows_console()
-    init()
-    print("\033[?25l", end="") # hides the cursor
-    # os.system("stty -echo") # silence terminal input TODO: this breaks mac terminal but works on mac VSCODE
+def main(stdscr):
+    """Main function - wraps game initialization with curses"""
+    init_colors()
+    
     try:
         file = open("assets/overworld.map") # starting map
         lines = file.read() 
         map = [list(line) for line in lines.split('\n')]
         x, y = find_start(map)
         player = Player(x, y, Warrior("Potat the Lost", 35))
-        game_loop(player, map)
+        game_loop(stdscr, player, map)
+    except KeyboardInterrupt:
+        pass
     finally:
-        print("\033[?25h", end="") # shows the cursor
-        # os.system("stty echo") # restore terminal input
-main()
+        curses.curs_set(1)  # Show cursor
+
+if __name__ == "__main__":
+    curses.wrapper(main)
 
 ###CAVE PART - this is cool
 
