@@ -178,13 +178,13 @@ def monster_random():
 
 def random_fight(player, map):
     if random.random() < 0.02:
-        os.system("cls")
+        clear_screen()
         fight_to_death(player.clazz, monster_random())
         time.sleep(3)
         if player.clazz.hp < 1:
             print("Game Over.")
             sys.exit()
-        os.system("cls")
+        clear_screen()
         print_map(map)
 
 def change_map(player, old_map, map_type):
@@ -197,7 +197,7 @@ def change_map(player, old_map, map_type):
         game_loop(player, map) # TODO: make a way that if you gain something inside, player outside also does
         player.old_char = 'c'
         player.x, player.y = old_x, old_y
-        os.system("cls")
+        clear_screen()
         print_map(old_map)
 
 ### Trying to make pynput work, starting from importing
@@ -212,7 +212,7 @@ running = True
 def game_loop(player, map):
     global last_key, running
 
-    os.system("cls")
+    clear_screen()
     print_map(map)
 
     def on_press(key):
@@ -239,36 +239,19 @@ def game_loop(player, map):
             last_key = None
 
             if key == '0':
-                os.system("cls")
+                clear_screen()
                 break
 
             move(player, key, map)
             
             if player.old_char == 'E': # we put this after move() because thats when old_char gets updated
-                os.system("cls")
+                clear_screen()
                 break
             change_map(player, map, player.old_char)
             random_fight(player, map)
         time.sleep(0.02)
     
     listener.stop()
-
-# def game_loop(player, map):
-#     os.system("cls")
-#     print_map(map)
-#     while True:
-#         if msvcrt.kbhit():
-#             key = msvcrt.getch().decode()
-#             if key == '0':
-#                 os.system("cls")
-#                 break
-#             move(player, key, map)
-#             if player.old_char == 'E': # we put this after move() because thats when old_char gets updated
-#                 os.system("cls")
-#                 break
-#             change_map(player, map, player.old_char)
-#             random_fight(player, map)
-#         time.sleep(0.02)
 
 def find_start(map):
     for i in range(len(map)):
@@ -277,10 +260,13 @@ def find_start(map):
                 return i, j
     return len(map) / 2, len(map[0]) / 2 # start at the middle of the map if player not found
 
-import msvcrt # TODO: graduate from this, only works on win (tried blessed, it sucks)
-import time, os, sys, random
+import time, os, sys, random, platform
 from map_generator import * # default customizable map_generator
 from colorama import just_fix_windows_console
+
+def clear_screen(): 
+    """Clear screen compatible with both Windows and macOS/Linux"""
+    # os.system('cls' if platform.system() == 'Windows' else 'clear') TODO: this breaks mac VSCode, upper column becomes invisible.
 
 # TODO: change cursor repaint logic so that it doesn't break if screen is not big enough
 # probably curses-python
@@ -289,6 +275,7 @@ def main():
     just_fix_windows_console()
     init()
     print("\033[?25l", end="") # hides the cursor
+    # os.system("stty -echo") # silence terminal input TODO: this breaks mac terminal but works on mac VSCODE
     try:
         file = open("assets/overworld.map") # starting map
         lines = file.read() 
@@ -297,7 +284,8 @@ def main():
         player = Player(x, y, Warrior("Potat the Lost", 35))
         game_loop(player, map)
     finally:
-        print("\033[?25h", end="")
+        print("\033[?25h", end="") # shows the cursor
+        # os.system("stty echo") # restore terminal input
 main()
 
 ###CAVE PART - this is cool
